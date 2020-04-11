@@ -25,6 +25,19 @@ namespace TIDALDL_UI.Else
                 ConfigHelper.SetValue(Key, SetValue, Group, CONFIGPATH);
             return null;
         }
+        private static string SetOrGetPrivate(string Key, string SetValue = null, string GetDefault = "", string Group = null)
+        {
+            if (Group.IsBlank())
+                Group = BASEGROUP;
+            if (SetValue.IsBlank())
+            {
+                string sTmp = ConfigHelper.GetValue(Key, GetDefault, Group, CONFIGPATH);
+                return Decode(sTmp);
+            }
+            else
+                ConfigHelper.SetValue(Key, Encode(SetValue), Group, CONFIGPATH);
+            return null;
+        }
 
 
         #region Base Config
@@ -40,15 +53,39 @@ namespace TIDALDL_UI.Else
 
         public static bool OnlyM4a(string Setvalue = null)
         {
-            string sValue = SetOrGet("onlym4a", Setvalue, "./");
+            string sValue = SetOrGet("onlym4a", Setvalue, "true");
             if (sValue == null || sValue.ToLower() != "true")
                 return false;
             return true;
         }
 
+        public static bool AddExplicitTag(string Setvalue = null)
+        {
+            string sValue = SetOrGet("addexplicit", Setvalue, "false");
+            if (sValue == null || sValue.ToLower() != "true")
+                return false;
+            return true;
+        }
+
+        public static bool IncludeEP(string Setvalue = null)
+        {
+            string sValue = SetOrGet("includesingle", Setvalue, "false");
+            if (sValue == null || sValue.ToLower() != "true")
+                return false;
+            return true;
+        }
+
+        public static bool SaveCovers(string Setvalue = null)
+        {
+            string sValue = SetOrGet("savephoto", Setvalue, "true");
+            if (sValue == null || sValue.ToLower() != "true")
+                return false;
+            return true;
+        }
+        
         public static bool AddHyphen(string Setvalue = null)
         {
-            string sValue = SetOrGet("addhyphen", Setvalue, "./");
+            string sValue = SetOrGet("addhyphen", Setvalue, "true");
             if (sValue == null || sValue.ToLower() != "true")
                 return false;
             return true;
@@ -57,6 +94,29 @@ namespace TIDALDL_UI.Else
         public static string Quality(string Setvalue = null)
         {
             return SetOrGet("quality", Setvalue, "HIGH");
+        }
+
+        public static int AddYear(int Setvalue = -1)
+        {
+            if (Setvalue == -1)
+            {
+                string sValue = SetOrGet("addyear", null, "No").ToLower();
+                if (sValue == "before")
+                    return 1;
+                else if (sValue == "after")
+                    return 2;
+                return 0;
+            }
+            else
+            {
+                string sValue = "No";
+                if (Setvalue == 1) 
+                    sValue = "Before";
+                if (Setvalue == 2) 
+                    sValue = "After";
+                SetOrGet("addyear", sValue, "No");
+                return 0;
+            }
         }
 
         public static Dictionary<int, string> QualityList()
@@ -78,9 +138,9 @@ namespace TIDALDL_UI.Else
 
         public static string ThreadNum(string Setvalue = null)
         {
-            //return SetOrGet("threadnum", Setvalue, "1");
-            SetOrGet("threadnum", Setvalue, "1");
-            return "1";
+            return SetOrGet("threadnum", Setvalue, "1");
+            //SetOrGet("threadnum", Setvalue, "1");
+            //return "1";
         }
 
         public static string SearchNum(string Setvalue = null)
@@ -90,12 +150,12 @@ namespace TIDALDL_UI.Else
 
         public static string Username(string Setvalue = null)
         {
-            return SetOrGet("username", Setvalue, "");
+            return SetOrGetPrivate("username", Setvalue, "");
         }
 
         public static string Password(string Setvalue = null)
         {
-            return SetOrGet("password", Setvalue, "");
+            return SetOrGetPrivate("password", Setvalue, "");
         }
 
         public static string Sessionid(string Setvalue = null)
@@ -199,8 +259,8 @@ namespace TIDALDL_UI.Else
             int iNum      = AIGS.Common.Convert.ConverStringToInt(sValue, 0);
             for (int i = 0; i < iNum; i++)
             {
-                string sUser = SetOrGet("historyuser" + i, null, "", HISTORYGROUP);
-                string sPwd  = SetOrGet("historypwd" + i, null, "", HISTORYGROUP);
+                string sUser = SetOrGetPrivate("historyuser" + i, null, "", HISTORYGROUP);
+                string sPwd  = SetOrGetPrivate("historypwd" + i, null, "", HISTORYGROUP);
                 if (sUser.IsNotBlank() && pRet.FindIndex((Property user) => user.Key.ToString() == sUser) < 0)
                     pRet.Add(new Property(sUser, sPwd));
             }
@@ -220,8 +280,8 @@ namespace TIDALDL_UI.Else
             pArray.Insert(0, new Property(sUsername, sPassword));
             for (int i = 0; i < pArray.Count; i++)
             {
-                SetOrGet("historyuser" + i, pArray[i].Key.ToString(), "", HISTORYGROUP);
-                SetOrGet("historypwd" + i, pArray[i].Value.ToString(), "", HISTORYGROUP);
+                SetOrGetPrivate("historyuser" + i, pArray[i].Key.ToString(), "", HISTORYGROUP);
+                SetOrGetPrivate("historypwd" + i, pArray[i].Value.ToString(), "", HISTORYGROUP);
             }
             SetOrGet("historyusernum", pArray.Count.ToString(), "", HISTORYGROUP);
             Username(sUsername);
@@ -261,6 +321,27 @@ namespace TIDALDL_UI.Else
                 SetOrGet("historysearch" + i, pArray[i], "", HISTORYGROUP);
             SetOrGet("historysearchnum", pArray.Count.ToString(), "", HISTORYGROUP);
         }
-        #endregion  
+        #endregion
+
+
+        #region Encryption
+        private static string EncryptionFlag = "Ax*~!9";
+        private static string Encode(string sStr)
+        {
+            if (sStr.IsBlank())
+                return sStr;
+            string sTmp = EncryptHelper.Encode(sStr, Tidal.TidalTool.USER_INFO_KEY);
+            return EncryptionFlag + sTmp;
+        }
+        private static string Decode(string data)
+        {
+            if (data.IsBlank())
+                return data;
+            if (data.IndexOf(EncryptionFlag) != 0)
+                return data;
+            string sTmp = data.Substring(EncryptionFlag.Length);
+            return EncryptHelper.Decode(sTmp, Tidal.TidalTool.USER_INFO_KEY);
+        }
+        #endregion
     }
 }
